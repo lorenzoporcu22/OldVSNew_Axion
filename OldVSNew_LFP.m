@@ -1,0 +1,537 @@
+%% Fixed Parameters
+addpath(genpath("S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\Lorenzo\codes\AxionFileInput"))
+% New
+rawFile_new  = 'S:\met_narkilahti_mea_until2025_sto-3678\Sudipta Swarna\2nd Round_045WTs and GreenTUBA\DOM27 161225\108-4504\161225_045WTs & greenTUBA_DOM27(000).raw';
+wells_new    = {'A1','A2','A3','A4','A5','A6','A7','A8', ...
+                'B1','B2','B3','B4','B5','B6','B7','B8', ...
+                'C1','C2','C3','C4','C5','C6','C7','C8'};
+cellLine_new = 'TUBA';
+DIV_new      = 59;
+
+% Old 1 N2894
+rawFile_old1  = 'S:\met_narkilahti_mea_until2025_sto-3678\Ropa\Dravet+OGD_Ropa+Venla_N2894_N2895\DIV60\DIV60\N2894_Dravet.OGD_81-6002_DD1C.N34.N27.TUBA_D60(000).raw';
+wells_old1    = {'F1','F2','F3','F4','F5','F6','F7','F8'};
+cellLine_old1 = 'TUBA';
+DIV_old1      = 60;
+
+% Old 2 N2905
+rawFile_old2  = 'S:\met_narkilahti_mea_until2025_sto-3678\Ropa\Cortical differentiation DravetExp6_TUBA_DD5A_DD3A_N2905\DIV 62\N2905_Corticaldifferentiation_TUBAN40_DD5AN39_DD3AN38_DIV62(000).raw';
+wells_old2    = {'C1','C2','C3','C4','C5','C6','C7','C8', ...
+                 'D1','D2','D3','D4','D5','D6','D7','D8'};
+cellLine_old2 = 'TUBA';
+DIV_old2      = 62;
+
+% Old 3 N2901
+% rawFile_old3  = 'S:\...TO_BE_FILLED...\file_old3.raw';
+% wells_old3    = {'A1','A2'};
+% cellLine_old3 = 'TUBA';
+% DIV_old3      = 0;
+
+% Plot flag
+makePlots = 'yes';  % 'yes' or 'no'
+
+%% Loading
+
+% [recordings_new,  sf_new,  selectedwells_new,  ~, ~] = loadAxionRecordings_NEW(rawFile_new,  wells_new,  cellLine_new,  DIV_new);
+% [recordings_old1, sf_old1, selectedwells_old1, ~, ~] = loadAxionRecordings_NEW(rawFile_old1, wells_old1, cellLine_old1, DIV_old1);
+% [recordings_old2, sf_old2, selectedwells_old2, ~, ~] = loadAxionRecordings_NEW(rawFile_old2, wells_old2, cellLine_old2, DIV_old2);
+% % [recordings_old3, sf_old3, selectedwells_old3, ~, ~] = loadAxionRecordings(rawFile_old3, wells_old3, cellLine_old3, DIV_old3);
+
+%% Folder Management
+
+MainFolder = 'S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\Lorenzo';
+if ~exist(MainFolder,'dir'), mkdir(MainFolder); end
+
+baseFolder = fullfile(MainFolder,'OldVSNew');
+if ~exist(baseFolder,'dir'), mkdir(baseFolder); end
+
+rawPsdFolder = fullfile(baseFolder,'Raw_PSD');
+lfpPsdFolder = fullfile(baseFolder,'LFP_PSD');
+if ~exist(rawPsdFolder,'dir'), mkdir(rawPsdFolder); end
+if ~exist(lfpPsdFolder,'dir'), mkdir(lfpPsdFolder); end
+
+bandPowerFolder = fullfile(lfpPsdFolder,'BandPower Comparison');
+if ~exist(bandPowerFolder,'dir'), mkdir(bandPowerFolder); end
+otherFolder = fullfile(lfpPsdFolder,'Other');
+if ~exist(otherFolder,'dir'), mkdir(otherFolder); end
+
+%% LFP Filtering Parameters
+
+lfp_cut      = 250;
+window_psd   = hamming(4096);
+noverlap_psd = 2048;
+nfft_psd     = 8192;
+
+[b_lfp, a_lfp] = butter(3, lfp_cut/(sf_new/2), 'low');
+
+%% CSV Spike Files
+
+csvFile_new  = 'S:\met_narkilahti_mea_until2025_sto-3678\Sudipta Swarna\2nd Round_045WTs and GreenTUBA\DOM27 161225\108-4504\161225_045WTs & greenTUBA_DOM27(000)_spike_list.csv';
+csvFile_old1 = 'S:\met_narkilahti_mea_until2025_sto-3678\Ropa\Dravet+OGD_Ropa+Venla_N2894_N2895\DIV60\DIV60\N2894_Dravet.OGD_81-6002_DD1C.N34.N27.TUBA_D60(000)_spike_list.csv';
+csvFile_old2 = 'S:\met_narkilahti_mea_until2025_sto-3678\Ropa\Cortical differentiation DravetExp6_TUBA_DD5A_DD3A_N2905\DIV 62\N2905_Corticaldifferentiation_TUBAN40_DD5AN39_DD3AN38_DIV62(000)_spike_list.csv';
+% csvFile_old3 = 'S:\...TO_BE_FILLED...\spikefile_old3.csv';
+
+duration  = 600;
+threshold = 0.1;
+
+%% Active Electrodes Detection
+
+activeElectrodesPerWell_new  = detectActiveElectrodes(csvFile_new,  duration, threshold);
+activeElectrodesPerWell_old1 = detectActiveElectrodes(csvFile_old1, duration, threshold);
+activeElectrodesPerWell_old2 = detectActiveElectrodes(csvFile_old2, duration, threshold);
+% activeElectrodesPerWell_old3 = detectActiveElectrodes(csvFile_old3, duration, threshold);
+
+%% Extraction of LFPs
+
+% --- NEW ---
+lfpResults_new = struct;
+for w = 1:length(selectedwells_new)
+    currentWell = selectedwells_new{w};
+    if ~isfield(recordings_new, currentWell)
+        warning('Well %s not found in recordings_new.', currentWell);
+        continue
+    end
+    electrodeNames = fieldnames(recordings_new.(currentWell));
+    lfp_all = [];
+    for e = 1:length(electrodeNames)
+        data         = recordings_new.(currentWell).(electrodeNames{e});
+        lfp_clean    = filtfilt(b_lfp, a_lfp, data);
+        lfp_all(:,e) = lfp_clean;
+    end
+    lfpResults_new(w).well        = currentWell;
+    lfpResults_new(w).lfp         = lfp_all;
+    lfpResults_new(w).electrodes  = electrodeNames;
+    lfpResults_new(w).nElectrodes = length(electrodeNames);
+    lfpResults_new(w).condition   = 'Control';
+end
+
+% --- OLD 1 ---
+lfpResults_old1 = struct;
+for w = 1:length(selectedwells_old1)
+    currentWell = selectedwells_old1{w};
+    if ~isfield(recordings_old1, currentWell)
+        warning('Well %s not found in recordings_old1.', currentWell);
+        continue
+    end
+    electrodeNames = fieldnames(recordings_old1.(currentWell));
+    lfp_all = [];
+    for e = 1:length(electrodeNames)
+        data         = recordings_old1.(currentWell).(electrodeNames{e});
+        lfp_clean    = filtfilt(b_lfp, a_lfp, data);
+        lfp_all(:,e) = lfp_clean;
+    end
+    lfpResults_old1(w).well        = currentWell;
+    lfpResults_old1(w).lfp         = lfp_all;
+    lfpResults_old1(w).electrodes  = electrodeNames;
+    lfpResults_old1(w).nElectrodes = length(electrodeNames);
+    lfpResults_old1(w).condition   = 'Control';
+end
+
+% --- OLD 2 ---
+lfpResults_old2 = struct;
+for w = 1:length(selectedwells_old2)
+    currentWell = selectedwells_old2{w};
+    if ~isfield(recordings_old2, currentWell)
+        warning('Well %s not found in recordings_old2.', currentWell);
+        continue
+    end
+    electrodeNames = fieldnames(recordings_old2.(currentWell));
+    lfp_all = [];
+    for e = 1:length(electrodeNames)
+        data         = recordings_old2.(currentWell).(electrodeNames{e});
+        lfp_clean    = filtfilt(b_lfp, a_lfp, data);
+        lfp_all(:,e) = lfp_clean;
+    end
+    lfpResults_old2(w).well        = currentWell;
+    lfpResults_old2(w).lfp         = lfp_all;
+    lfpResults_old2(w).electrodes  = electrodeNames;
+    lfpResults_old2(w).nElectrodes = length(electrodeNames);
+    lfpResults_old2(w).condition   = 'Control';
+end
+
+% --- OLD 3 (commentato) ---
+% lfpResults_old3 = struct;
+% for w = 1:length(selectedwells_old3) ...
+% end
+
+%% PSD for LFP - all datasets
+
+% --- NEW ---
+lfpPSD_new = struct();
+for w = 1:length(lfpResults_new)
+    wellName = lfpResults_new(w).well;
+
+    % disp(class(lfpResults_new(1).well))
+    % disp(lfpResults_new(1).well)
+    % disp(class(activeElectrodesPerWell_new(1).well))
+    % disp(activeElectrodesPerWell_new(1).well)
+
+    activeWellIdx = find(strcmp(cellstr([activeElectrodesPerWell_new.well]), wellName));
+    if isempty(activeWellIdx)
+        warning('Well %s not found in activeElectrodesPerWell_new', wellName);
+        continue
+    end
+    activeNames = activeElectrodesPerWell_new(activeWellIdx).activeElectrodes;
+
+    [~, activeIdx] = ismember(activeNames, lfpResults_new(w).electrodes);
+    activeIdx(activeIdx == 0) = [];
+    if isempty(activeIdx)
+        warning('No active electrodes found for well %s', wellName);
+        continue
+    end
+
+    electrodes = lfpResults_new(w).electrodes(activeIdx);
+    psd_all = [];
+    for e = 1:length(activeIdx)
+        data    = lfpResults_new(w).lfp(:, activeIdx(e));
+        [pxx,f] = pwelch(data, window_psd, noverlap_psd, nfft_psd, sf_new);
+        idxF    = f <= lfp_cut;
+        if e == 1
+            psd_all = zeros(sum(idxF), length(activeIdx));
+            f_plot  = f(idxF);
+        end
+        psd_all(:,e) = pxx(idxF);
+    end
+    mean_psd = mean(psd_all, 2);
+
+    lfpPSD_new(w).well       = wellName;
+    lfpPSD_new(w).electrodes = electrodes;
+    lfpPSD_new(w).frequency  = f_plot;
+    lfpPSD_new(w).psd_all    = psd_all;
+    lfpPSD_new(w).mean_psd   = mean_psd;
+
+    if strcmpi(makePlots, 'yes')
+        fig = figure('Visible','off'); hold on;
+        colors = lines(length(activeIdx));
+        for e = 1:length(activeIdx)
+            plot(f_plot, 10*log10(psd_all(:,e)), 'Color', colors(e,:), 'LineWidth', 1, 'DisplayName', electrodes{e});
+        end
+        plot(f_plot, 10*log10(mean_psd), 'k', 'LineWidth', 3, 'DisplayName', 'Mean');
+        xlabel('Frequency (Hz)'); ylabel('Power (dB/Hz)');
+        title(['LFP PSD (0–' num2str(lfp_cut) ' Hz) - NEW - Well ' wellName]);
+        grid on; legend show;
+        exportgraphics(fig, fullfile(lfpPsdFolder, ['PSD_LFP_NEW_Well_' wellName '.png']), 'Resolution', 300);
+        close(fig);
+    end
+end
+disp('✅ LFP PSD - NEW completed.');
+
+% --- OLD 1 ---
+lfpPSD_old1 = struct();
+for w = 1:length(lfpResults_old1)
+    wellName = lfpResults_old1(w).well;
+
+    activeWellIdx = find(strcmp(cellstr([activeElectrodesPerWell_old1.well]), wellName));
+    if isempty(activeWellIdx)
+        warning('Well %s not found in activeElectrodesPerWell_old1', wellName);
+        continue
+    end
+    activeNames = activeElectrodesPerWell_old1(activeWellIdx).activeElectrodes;
+
+    [~, activeIdx] = ismember(activeNames, lfpResults_old1(w).electrodes);
+    activeIdx(activeIdx == 0) = [];
+    if isempty(activeIdx)
+        warning('No active electrodes found for well %s', wellName);
+        continue
+    end
+
+    electrodes = lfpResults_old1(w).electrodes(activeIdx);
+    psd_all = [];
+    for e = 1:length(activeIdx)
+        data    = lfpResults_old1(w).lfp(:, activeIdx(e));
+        [pxx,f] = pwelch(data, window_psd, noverlap_psd, nfft_psd, sf_old1);
+        idxF    = f <= lfp_cut;
+        if e == 1
+            psd_all = zeros(sum(idxF), length(activeIdx));
+            f_plot  = f(idxF);
+        end
+        psd_all(:,e) = pxx(idxF);
+    end
+    mean_psd = mean(psd_all, 2);
+
+    lfpPSD_old1(w).well       = wellName;
+    lfpPSD_old1(w).electrodes = electrodes;
+    lfpPSD_old1(w).frequency  = f_plot;
+    lfpPSD_old1(w).psd_all    = psd_all;
+    lfpPSD_old1(w).mean_psd   = mean_psd;
+
+    if strcmpi(makePlots, 'yes')
+        fig = figure('Visible','off'); hold on;
+        colors = lines(length(activeIdx));
+        for e = 1:length(activeIdx)
+            plot(f_plot, 10*log10(psd_all(:,e)), 'Color', colors(e,:), 'LineWidth', 1, 'DisplayName', electrodes{e});
+        end
+        plot(f_plot, 10*log10(mean_psd), 'k', 'LineWidth', 3, 'DisplayName', 'Mean');
+        xlabel('Frequency (Hz)'); ylabel('Power (dB/Hz)');
+        title(['LFP PSD (0–' num2str(lfp_cut) ' Hz) - OLD1 - Well ' wellName]);
+        grid on; legend show;
+        exportgraphics(fig, fullfile(lfpPsdFolder, ['PSD_LFP_OLD1_Well_' wellName '.png']), 'Resolution', 300);
+        close(fig);
+    end
+end
+disp('✅ LFP PSD - OLD1 completed.');
+
+% --- OLD 2 ---
+lfpPSD_old2 = struct();
+for w = 1:length(lfpResults_old2)
+    wellName = lfpResults_old2(w).well;
+
+    activeWellIdx = find(strcmp(cellstr([activeElectrodesPerWell_old2.well]), wellName));
+    if isempty(activeWellIdx)
+        warning('Well %s not found in activeElectrodesPerWell_old2', wellName);
+        continue
+    end
+    activeNames = activeElectrodesPerWell_old2(activeWellIdx).activeElectrodes;
+
+    [~, activeIdx] = ismember(activeNames, lfpResults_old2(w).electrodes);
+    activeIdx(activeIdx == 0) = [];
+    if isempty(activeIdx)
+        warning('No active electrodes found for well %s', wellName);
+        continue
+    end
+
+    electrodes = lfpResults_old2(w).electrodes(activeIdx);
+    psd_all = [];
+    for e = 1:length(activeIdx)
+        data    = lfpResults_old2(w).lfp(:, activeIdx(e));
+        [pxx,f] = pwelch(data, window_psd, noverlap_psd, nfft_psd, sf_old2);
+        idxF    = f <= lfp_cut;
+        if e == 1
+            psd_all = zeros(sum(idxF), length(activeIdx));
+            f_plot  = f(idxF);
+        end
+        psd_all(:,e) = pxx(idxF);
+    end
+    mean_psd = mean(psd_all, 2);
+
+    lfpPSD_old2(w).well       = wellName;
+    lfpPSD_old2(w).electrodes = electrodes;
+    lfpPSD_old2(w).frequency  = f_plot;
+    lfpPSD_old2(w).psd_all    = psd_all;
+    lfpPSD_old2(w).mean_psd   = mean_psd;
+
+    if strcmpi(makePlots, 'yes')
+        fig = figure('Visible','off'); hold on;
+        colors = lines(length(activeIdx));
+        for e = 1:length(activeIdx)
+            plot(f_plot, 10*log10(psd_all(:,e)), 'Color', colors(e,:), 'LineWidth', 1, 'DisplayName', electrodes{e});
+        end
+        plot(f_plot, 10*log10(mean_psd), 'k', 'LineWidth', 3, 'DisplayName', 'Mean');
+        xlabel('Frequency (Hz)'); ylabel('Power (dB/Hz)');
+        title(['LFP PSD (0–' num2str(lfp_cut) ' Hz) - OLD2 - Well ' wellName]);
+        grid on; legend show;
+        exportgraphics(fig, fullfile(lfpPsdFolder, ['PSD_LFP_OLD2_Well_' wellName '.png']), 'Resolution', 300);
+        close(fig);
+    end
+end
+disp('✅ LFP PSD - OLD2 completed.');
+
+% --- OLD 3 (commentato) ---
+% lfpPSD_old3 = struct();
+% for w = 1:length(lfpResults_old3) ...
+% end
+
+%% Overlay PSD: New vs Old1 vs Old2 (mean ± 95% CI across wells)
+% active electrodes --> average per well --> average per system
+
+% --- NEW ---
+allPSD_new = [];
+for w = 1:length(lfpPSD_new)
+    if ~isempty(lfpPSD_new(w).mean_psd)
+        allPSD_new(:, end+1) = lfpPSD_new(w).mean_psd;
+    end
+end
+f        = lfpPSD_new(1).frequency;
+n_new    = size(allPSD_new, 2);
+mean_new = mean(allPSD_new, 2);
+ci_up_new = mean_new + 1.96 * (std(allPSD_new, 0, 2) / sqrt(n_new));
+ci_lo_new = mean_new - 1.96 * (std(allPSD_new, 0, 2) / sqrt(n_new));
+
+% --- OLD 1 ---
+allPSD_old1 = [];
+for w = 1:length(lfpPSD_old1)
+    if ~isempty(lfpPSD_old1(w).mean_psd)
+        allPSD_old1(:, end+1) = lfpPSD_old1(w).mean_psd;
+    end
+end
+n_old1    = size(allPSD_old1, 2);
+mean_old1 = mean(allPSD_old1, 2);
+ci_up_old1 = mean_old1 + 1.96 * (std(allPSD_old1, 0, 2) / sqrt(n_old1));
+ci_lo_old1 = mean_old1 - 1.96 * (std(allPSD_old1, 0, 2) / sqrt(n_old1));
+
+% --- OLD 2 ---
+allPSD_old2 = [];
+for w = 1:length(lfpPSD_old2)
+    if ~isempty(lfpPSD_old2(w).mean_psd)
+        allPSD_old2(:, end+1) = lfpPSD_old2(w).mean_psd;
+    end
+end
+n_old2    = size(allPSD_old2, 2);
+mean_old2 = mean(allPSD_old2, 2);
+ci_up_old2 = mean_old2 + 1.96 * (std(allPSD_old2, 0, 2) / sqrt(n_old2));
+ci_lo_old2 = mean_old2 - 1.96 * (std(allPSD_old2, 0, 2) / sqrt(n_old2));
+
+% --- Plot ---
+c_new  = [0.85 0.15 0.15];
+c_old1 = [0.15 0.35 0.85];
+c_old2 = [0.10 0.70 0.30];
+
+fig = figure('Visible', 'off'); hold on;
+
+fill([f; flipud(f)], [10*log10(ci_up_new); flipud(10*log10(ci_lo_new))], ...
+    c_new, 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+plot(f, 10*log10(mean_new), 'Color', c_new, 'LineWidth', 2, 'DisplayName', 'New');
+
+fill([f; flipud(f)], [10*log10(ci_up_old1); flipud(10*log10(ci_lo_old1))], ...
+    c_old1, 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+plot(f, 10*log10(mean_old1), 'Color', c_old1, 'LineWidth', 2, 'DisplayName', 'Old1');
+
+fill([f; flipud(f)], [10*log10(ci_up_old2); flipud(10*log10(ci_lo_old2))], ...
+    c_old2, 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+plot(f, 10*log10(mean_old2), 'Color', c_old2, 'LineWidth', 2, 'DisplayName', 'Old2');
+
+xlabel('Frequency (Hz)');
+ylabel('Power (dB/Hz)');
+title(['LFP PSD: New vs Old (mean ± 95% CI) - 0–' num2str(lfp_cut) ' Hz']);
+grid on;
+legend show;
+
+exportgraphics(fig, fullfile(lfpPsdFolder, 'Overlay_LFP_PSD_NewVsOld_separated.png'), 'Resolution', 300);
+savefig(fig, fullfile(lfpPsdFolder, 'Overlay_LFP_PSD_NewVsOld_separated.fig'));
+close(fig);
+disp('✅ Overlay Separated PSD plot saved.');
+
+%% Overlay PSD: New vs Old (mean ± 95% CI across wells)
+
+% --- NEW ---
+allPSD_new = [];
+for w = 1:length(lfpPSD_new)
+    if ~isempty(lfpPSD_new(w).mean_psd)
+        allPSD_new(:, end+1) = lfpPSD_new(w).mean_psd;
+    end
+end
+f         = lfpPSD_new(1).frequency;
+n_new     = size(allPSD_new, 2);
+mean_new  = mean(allPSD_new, 2);
+ci_up_new = mean_new + 1.96 * (std(allPSD_new, 0, 2) / sqrt(n_new));
+ci_lo_new = mean_new - 1.96 * (std(allPSD_new, 0, 2) / sqrt(n_new));
+
+% --- OLD (old1 + old2 )
+allPSD_old = [];
+for w = 1:length(lfpPSD_old1)
+    if ~isempty(lfpPSD_old1(w).mean_psd)
+        allPSD_old(:, end+1) = lfpPSD_old1(w).mean_psd;
+    end
+end
+for w = 1:length(lfpPSD_old2)
+    if ~isempty(lfpPSD_old2(w).mean_psd)
+        allPSD_old(:, end+1) = lfpPSD_old2(w).mean_psd;
+    end
+end
+n_old     = size(allPSD_old, 2);
+mean_old  = mean(allPSD_old, 2);
+ci_up_old = mean_old + 1.96 * (std(allPSD_old, 0, 2) / sqrt(n_old));
+ci_lo_old = mean_old - 1.96 * (std(allPSD_old, 0, 2) / sqrt(n_old));
+
+% --- Plot ---
+c_new = [0.85 0.15 0.15];
+c_old = [0.15 0.35 0.85];
+
+fig = figure('Visible', 'off'); hold on;
+
+fill([f; flipud(f)], [10*log10(ci_up_new); flipud(10*log10(ci_lo_new))], ...
+    c_new, 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+plot(f, 10*log10(mean_new), 'Color', c_new, 'LineWidth', 2, 'DisplayName', 'New');
+
+fill([f; flipud(f)], [10*log10(ci_up_old); flipud(10*log10(ci_lo_old))], ...
+    c_old, 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+plot(f, 10*log10(mean_old), 'Color', c_old, 'LineWidth', 2, 'DisplayName', 'Old');
+
+xlabel('Frequency (Hz)');
+ylabel('Power (dB/Hz)');
+title(['LFP PSD: New vs Old (mean ± 95% CI) - 0–' num2str(lfp_cut) ' Hz']);
+grid on;
+legend show;
+
+exportgraphics(fig, fullfile(lfpPsdFolder, 'Overlay_LFP_PSD_NewVsOld.png'), 'Resolution', 300);
+savefig(fig, fullfile(lfpPsdFolder, 'Overlay_LFP_PSD_NewVsOld.fig'));
+close(fig);
+disp('✅ Overlay PSD plot saved.');
+%%
+lfpBandResults_new  = computeLfpBandPowers_v2(lfpPSD_new);
+lfpBandResults_old1 = computeLfpBandPowers_v2(lfpPSD_old1);
+lfpBandResults_old2 = computeLfpBandPowers_v2(lfpPSD_old2);
+%%
+%% Boxplot Band Power: New vs Old (absolute and relative)
+
+bandNames = {'delta', 'theta', 'alpha', 'beta', 'gamma'};
+
+% --- Raccolta dati per well ---
+% Ogni riga = una well, ogni colonna = una banda
+
+absPow_new = zeros(length(lfpBandResults_new), length(bandNames));
+absPow_old = zeros(length(lfpBandResults_old1) + length(lfpBandResults_old2), length(bandNames));
+relPow_new = zeros(length(lfpBandResults_new), length(bandNames));
+relPow_old = zeros(length(lfpBandResults_old1) + length(lfpBandResults_old2), length(bandNames));
+
+for b = 1:length(bandNames)
+    band = bandNames{b};
+
+    for w = 1:length(lfpBandResults_new)
+    if ~isfield(lfpBandResults_new(w).bandPower.abs, 'delta'), continue; end
+    absPow_new(w,b) = lfpBandResults_new(w).bandPower.abs.(band);
+    relPow_new(w,b) = lfpBandResults_new(w).bandPower.rel.(band);
+    end
+
+    % OLD 1 + OLD 2
+    for w = 1:length(lfpBandResults_old1)
+        if ~isfield(lfpBandResults_old1(w).bandPower.abs, 'delta'), continue; end
+        absPow_old(w,b) = lfpBandResults_old1(w).bandPower.abs.(band);
+        relPow_old(w,b) = lfpBandResults_old1(w).bandPower.rel.(band);
+    end
+    offset = length(lfpBandResults_old1);
+    for w = 1:length(lfpBandResults_old2)
+        if ~isfield(lfpBandResults_old2(w).bandPower.abs, 'delta'), continue; end
+        absPow_old(offset+w,b) = lfpBandResults_old2(w).bandPower.abs.(band);
+        relPow_old(offset+w,b) = lfpBandResults_old2(w).bandPower.rel.(band);
+    end
+end
+
+c_new = [0.85 0.15 0.15];
+c_old = [0.15 0.35 0.85];
+
+% --- ABSOLUTE POWER ---
+fig_abs = figure('Visible','off','Position',[100 100 1400 500]);
+t_abs = tiledlayout(1,5,'TileSpacing','compact','Padding','loose');
+for b = 1:length(bandNames)
+    nexttile;
+    data   = [absPow_new(:,b); absPow_old(:,b)];
+    groups = [ones(size(absPow_new,1),1); 2*ones(size(absPow_old,1),1)];
+    boxplot(data, groups, 'Labels', {'New','Old'}, 'Colors', [c_new; c_old]);
+    title(bandNames{b});
+    ylabel('Absolute Power (V²/Hz)');
+    grid on;
+end
+title(t_abs, 'Absolute Band Power: New vs Old', 'FontSize', 13);
+exportgraphics(fig_abs, fullfile(bandPowerFolder, 'BoxPlot_AbsBandPower_NewVsOld.png'), 'Resolution', 300);
+savefig(fig_abs, fullfile(bandPowerFolder, 'BoxPlot_AbsBandPower_NewVsOld.fig'));
+close(fig_abs);
+disp('✅ Absolute band power boxplot saved.');
+
+% --- RELATIVE POWER ---
+fig_rel = figure('Visible','off','Position',[100 100 1400 500]);
+t_rel = tiledlayout(1,5,'TileSpacing','compact','Padding','loose');
+for b = 1:length(bandNames)
+    nexttile;
+    data   = [relPow_new(:,b); relPow_old(:,b)];
+    groups = [ones(size(relPow_new,1),1); 2*ones(size(relPow_old,1),1)];
+    boxplot(data, groups, 'Labels', {'New','Old'}, 'Colors', [c_new; c_old]);
+    title(bandNames{b});
+    ylabel('Relative Power (%)');
+    grid on;
+end
+title(t_rel, 'Relative Band Power: New vs Old', 'FontSize', 13);
+exportgraphics(fig_rel, fullfile(bandPowerFolder, 'BoxPlot_RelBandPower_NewVsOld.png'), 'Resolution', 300);
+savefig(fig_rel, fullfile(bandPowerFolder, 'BoxPlot_RelBandPower_NewVsOld.fig'));
+close(fig_rel);
+disp('✅ Relative band power boxplot saved.');
