@@ -1,4 +1,4 @@
-function [recordings, sf, selectedWells, cellLine, DIV] = loadAxionRecordings(rawFilePath, wellsToLoad, cellLine, DIV)
+function [recordings, sf, selectedWells, cellLine, DIV] = loadAxionRecordings_auto(rawFilePath, wellsToLoad, cellLine, DIV)
 % LOADAXIONRECORDINGS Load Axion MEA recording with optional scripted inputs
 %
 % INPUTS (all optional, fallback to interactive dialogs if not provided):
@@ -15,7 +15,7 @@ function [recordings, sf, selectedWells, cellLine, DIV] = loadAxionRecordings(ra
 %   DIV            - Day in vitro
 %
 % EXAMPLE (scripted, no dialogs):
-%   [rec, sf, wells, cl, div] = loadAxionRecordings('C:\data\rec.raw', {'A1','B1'}, 'iPSC', 14);
+%   [rec, sf, wells, cl, div] = loadAxionRecordings('C:\data\rec.raw', {'A1','B1'}, 'TUBA', 14);
 %
 % EXAMPLE (interactive, original behavior):
 %   [rec, sf, wells, cl, div] = loadAxionRecordings();
