@@ -32,10 +32,10 @@ makePlots = 'yes';  % 'yes' or 'no'
 
 %% Loading
 
-% [recordings_new,  sf_new,  selectedwells_new,  ~, ~] = loadAxionRecordings_NEW(rawFile_new,  wells_new,  cellLine_new,  DIV_new);
-% [recordings_old1, sf_old1, selectedwells_old1, ~, ~] = loadAxionRecordings_NEW(rawFile_old1, wells_old1, cellLine_old1, DIV_old1);
-% [recordings_old2, sf_old2, selectedwells_old2, ~, ~] = loadAxionRecordings_NEW(rawFile_old2, wells_old2, cellLine_old2, DIV_old2);
-% % [recordings_old3, sf_old3, selectedwells_old3, ~, ~] = loadAxionRecordings(rawFile_old3, wells_old3, cellLine_old3, DIV_old3);
+% [recordings_new,  sf_new,  selectedwells_new,  ~, ~] = loadAxionRecordings_auto(rawFile_new,  wells_new,  cellLine_new,  DIV_new);
+% [recordings_old1, sf_old1, selectedwells_old1, ~, ~] = loadAxionRecordings_auto(rawFile_old1, wells_old1, cellLine_old1, DIV_old1);
+% [recordings_old2, sf_old2, selectedwells_old2, ~, ~] = loadAxionRecordings_auto(rawFile_old2, wells_old2, cellLine_old2, DIV_old2);
+% % [recordings_old3, sf_old3, selectedwells_old3, ~, ~] = loadAxionRecordings_auto(rawFile_old3, wells_old3, cellLine_old3, DIV_old3);
 
 %% Folder Management
 
