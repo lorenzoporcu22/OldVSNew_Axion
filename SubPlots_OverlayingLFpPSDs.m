@@ -67,140 +67,140 @@ c_old = [0.15 0.35 0.85];
 outputFolder = 'S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\Lorenzo\OldVSNew';
 if ~exist(outputFolder, 'dir'), mkdir(outputFolder); end
 
-%% BLOCK 1: LOAD RAW RECORDINGS 
-% Run this block once — it is slow
-
-recordings = struct();
-
-for p = 1:4
-    tag = panels(p).tag;
-    fprintf('Loading panel %d of 4 (%s)...\n', p, tag);
-
-    [recordings.(tag).new,  recordings.(tag).sf_new,  ~, ~, ~] = loadAxionRecordings_auto(panels(p).rawFile_new,  wells_new,  cellLine, 0);
-    [recordings.(tag).old1, recordings.(tag).sf_old1, ~, ~, ~] = loadAxionRecordings_auto(panels(p).rawFile_old1, wells_old1, cellLine, 0);
-    [recordings.(tag).old2, recordings.(tag).sf_old2, ~, ~, ~] = loadAxionRecordings_auto(panels(p).rawFile_old2, wells_old2, cellLine, 0);
-
-    fprintf('✅ %s raw data loaded.\n', tag);
-end
-disp('✅ All raw recordings loaded.');
-
-%% BLOCK 2: DETECT ACTIVE ELECTRODES
-% Fast — run after Block 1
-
-activeElec = struct();
-
-for p = 1:4
-    tag = panels(p).tag;
-
-    activeElec.(tag).new  = detectActiveElectrodes(panels(p).csvFile_new,  duration, threshold);
-    activeElec.(tag).old1 = detectActiveElectrodes(panels(p).csvFile_old1, duration, threshold);
-    activeElec.(tag).old2 = detectActiveElectrodes(panels(p).csvFile_old2, duration, threshold);
-
-    fprintf('✅ %s active electrodes detected.\n', tag);
-end
-disp('✅ All active electrodes detected.');
-
-
-%% SAVING BLOCK
-
-% Run once after Block 1 and Block 2
-% Saves only active electrodes per DIV per system — much smaller than full recordings
-
-saveFolder = fullfile(outputFolder, 'data');
-if ~exist(saveFolder, 'dir'), mkdir(saveFolder); end
-
-for p = 1:4
-    tag = panels(p).tag;
-    fprintf('Saving %s...\n', tag);
-
-    % --- Extract only active electrodes from recordings ---
-    rec_active = struct();
-    rec_active.sf_new  = recordings.(tag).sf_new;
-    rec_active.sf_old1 = recordings.(tag).sf_old1;
-    rec_active.sf_old2 = recordings.(tag).sf_old2;
-
-    % NEW
-    for w = 1:length(wells_new)
-        wName = wells_new{w};
-        wellIdx = find(strcmp(cellstr([activeElec.(tag).new.well]), wName));
-        if isempty(wellIdx), continue; end
-        activeNames = activeElec.(tag).new(wellIdx).activeElectrodes;
-        if isempty(activeNames), continue; end
-        for e = 1:length(activeNames)
-            eName = activeNames{e};
-            if ~isfield(recordings.(tag).new, wName), continue; end
-            if ~isfield(recordings.(tag).new.(wName), eName), continue; end
-            rec_active.new.(wName).(eName) = recordings.(tag).new.(wName).(eName);
-        end
-    end
-
-    % OLD1
-    for w = 1:length(wells_old1)
-        wName = wells_old1{w};
-        wellIdx = find(strcmp(cellstr([activeElec.(tag).old1.well]), wName));
-        if isempty(wellIdx), continue; end
-        activeNames = activeElec.(tag).old1(wellIdx).activeElectrodes;
-        if isempty(activeNames), continue; end
-        for e = 1:length(activeNames)
-            eName = activeNames{e};
-            if ~isfield(recordings.(tag).old1, wName), continue; end
-            if ~isfield(recordings.(tag).old1.(wName), eName), continue; end
-            rec_active.old1.(wName).(eName) = recordings.(tag).old1.(wName).(eName);
-        end
-    end
-
-    % OLD2
-    for w = 1:length(wells_old2)
-        wName = wells_old2{w};
-        wellIdx = find(strcmp(cellstr([activeElec.(tag).old2.well]), wName));
-        if isempty(wellIdx), continue; end
-        activeNames = activeElec.(tag).old2(wellIdx).activeElectrodes;
-        if isempty(activeNames), continue; end
-        for e = 1:length(activeNames)
-            eName = activeNames{e};
-            if ~isfield(recordings.(tag).old2, wName), continue; end
-            if ~isfield(recordings.(tag).old2.(wName), eName), continue; end
-            rec_active.old2.(wName).(eName) = recordings.(tag).old2.(wName).(eName);
-        end
-    end
-
-    % --- Save to disk ---
-    saveFile = fullfile(saveFolder, ['recordings_active_' tag '.mat']);
-    save(saveFile, 'rec_active', '-v7.3');
-    fprintf('✅ %s saved → %s\n', tag, saveFile);
-
-end
-disp('✅ All active recordings saved.');
-
-saveFile_ae = fullfile(saveFolder, 'activeElec.mat');
-save(saveFile_ae, 'activeElec', 'panels', 'wells_new', 'wells_old1', 'wells_old2', ...
-     'lfp_cut', 'window_psd', 'noverlap_psd', 'nfft_psd', 'c_new', 'c_old', ...
-     'outputFolder', 'duration', 'threshold', 'cellLine');
-fprintf('✅ activeElec + parameters saved → %s\n', saveFile_ae);
+% %% BLOCK 1: LOAD RAW RECORDINGS 
+% % Run this block once — it is slow
+% 
+% recordings = struct();
+% 
+% for p = 1:4
+%     tag = panels(p).tag;
+%     fprintf('Loading panel %d of 4 (%s)...\n', p, tag);
+% 
+%     [recordings.(tag).new,  recordings.(tag).sf_new,  ~, ~, ~] = loadAxionRecordings_auto(panels(p).rawFile_new,  wells_new,  cellLine, 0);
+%     [recordings.(tag).old1, recordings.(tag).sf_old1, ~, ~, ~] = loadAxionRecordings_auto(panels(p).rawFile_old1, wells_old1, cellLine, 0);
+%     [recordings.(tag).old2, recordings.(tag).sf_old2, ~, ~, ~] = loadAxionRecordings_auto(panels(p).rawFile_old2, wells_old2, cellLine, 0);
+% 
+%     fprintf('✅ %s raw data loaded.\n', tag);
+% end
+% disp('✅ All raw recordings loaded.');
+% 
+% %% BLOCK 2: DETECT ACTIVE ELECTRODES
+% % Fast — run after Block 1
+% 
+% activeElec = struct();
+% 
+% for p = 1:4
+%     tag = panels(p).tag;
+% 
+%     activeElec.(tag).new  = detectActiveElectrodes(panels(p).csvFile_new,  duration, threshold);
+%     activeElec.(tag).old1 = detectActiveElectrodes(panels(p).csvFile_old1, duration, threshold);
+%     activeElec.(tag).old2 = detectActiveElectrodes(panels(p).csvFile_old2, duration, threshold);
+% 
+%     fprintf('✅ %s active electrodes detected.\n', tag);
+% end
+% disp('✅ All active electrodes detected.');
+% 
+% 
+% %% SAVING BLOCK
+% 
+% % Run once after Block 1 and Block 2
+% % Saves only active electrodes per DIV per system — much smaller than full recordings
+% 
+% saveFolder = fullfile(outputFolder, 'data');
+% if ~exist(saveFolder, 'dir'), mkdir(saveFolder); end
+% 
+% for p = 1:4
+%     tag = panels(p).tag;
+%     fprintf('Saving %s...\n', tag);
+% 
+%     % --- Extract only active electrodes from recordings ---
+%     rec_active = struct();
+%     rec_active.sf_new  = recordings.(tag).sf_new;
+%     rec_active.sf_old1 = recordings.(tag).sf_old1;
+%     rec_active.sf_old2 = recordings.(tag).sf_old2;
+% 
+%     % NEW
+%     for w = 1:length(wells_new)
+%         wName = wells_new{w};
+%         wellIdx = find(strcmp(cellstr([activeElec.(tag).new.well]), wName));
+%         if isempty(wellIdx), continue; end
+%         activeNames = activeElec.(tag).new(wellIdx).activeElectrodes;
+%         if isempty(activeNames), continue; end
+%         for e = 1:length(activeNames)
+%             eName = activeNames{e};
+%             if ~isfield(recordings.(tag).new, wName), continue; end
+%             if ~isfield(recordings.(tag).new.(wName), eName), continue; end
+%             rec_active.new.(wName).(eName) = recordings.(tag).new.(wName).(eName);
+%         end
+%     end
+% 
+%     % OLD1
+%     for w = 1:length(wells_old1)
+%         wName = wells_old1{w};
+%         wellIdx = find(strcmp(cellstr([activeElec.(tag).old1.well]), wName));
+%         if isempty(wellIdx), continue; end
+%         activeNames = activeElec.(tag).old1(wellIdx).activeElectrodes;
+%         if isempty(activeNames), continue; end
+%         for e = 1:length(activeNames)
+%             eName = activeNames{e};
+%             if ~isfield(recordings.(tag).old1, wName), continue; end
+%             if ~isfield(recordings.(tag).old1.(wName), eName), continue; end
+%             rec_active.old1.(wName).(eName) = recordings.(tag).old1.(wName).(eName);
+%         end
+%     end
+% 
+%     % OLD2
+%     for w = 1:length(wells_old2)
+%         wName = wells_old2{w};
+%         wellIdx = find(strcmp(cellstr([activeElec.(tag).old2.well]), wName));
+%         if isempty(wellIdx), continue; end
+%         activeNames = activeElec.(tag).old2(wellIdx).activeElectrodes;
+%         if isempty(activeNames), continue; end
+%         for e = 1:length(activeNames)
+%             eName = activeNames{e};
+%             if ~isfield(recordings.(tag).old2, wName), continue; end
+%             if ~isfield(recordings.(tag).old2.(wName), eName), continue; end
+%             rec_active.old2.(wName).(eName) = recordings.(tag).old2.(wName).(eName);
+%         end
+%     end
+% 
+%     % --- Save to disk ---
+%     saveFile = fullfile(saveFolder, ['recordings_active_' tag '.mat']);
+%     save(saveFile, 'rec_active', '-v7.3');
+%     fprintf('✅ %s saved → %s\n', tag, saveFile);
+% 
+% end
+% disp('✅ All active recordings saved.');
+% 
+% saveFile_ae = fullfile(saveFolder, 'activeElec.mat');
+% save(saveFile_ae, 'activeElec', 'panels', 'wells_new', 'wells_old1', 'wells_old2', ...
+%      'lfp_cut', 'window_psd', 'noverlap_psd', 'nfft_psd', 'c_new', 'c_old', ...
+%      'outputFolder', 'duration', 'threshold', 'cellLine');
+% fprintf('✅ activeElec + parameters saved → %s\n', saveFile_ae);
 
 %%  LOAD BLOCK — run this instead of Block 1 and Block 2 
 % Uncomment and run this block in future sessions to skip the slow loading
 
-% saveFolder = 'S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\Lorenzo\OldVSNew\data';
-% 
-% % Load parameters + activeElec + panels + wells
-% load(fullfile(saveFolder, 'activeElec.mat'));
-% fprintf('✅ activeElec and parameters loaded.\n');
-% 
-% % Load active recordings DIV by DIV
-% recordings = struct();
-% for p = 1:4
-%     tag = panels(p).tag;
-%     tmp = load(fullfile(saveFolder, ['recordings_active_' tag '.mat']));
-%     recordings.(tag).new     = tmp.rec_active.new;
-%     recordings.(tag).old1    = tmp.rec_active.old1;
-%     recordings.(tag).old2    = tmp.rec_active.old2;
-%     recordings.(tag).sf_new  = tmp.rec_active.sf_new;
-%     recordings.(tag).sf_old1 = tmp.rec_active.sf_old1;
-%     recordings.(tag).sf_old2 = tmp.rec_active.sf_old2;
-%     fprintf('✅ %s loaded.\n', tag);
-% end
-% disp('✅ All data loaded — ready to run figures.');
+saveFolder = 'S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\Lorenzo\OldVSNew\data';
+
+% Load parameters + activeElec + panels + wells
+load(fullfile(saveFolder, 'activeElec.mat'));
+fprintf('✅ activeElec and parameters loaded.\n');
+
+% Load active recordings DIV by DIV
+recordings = struct();
+for p = 1:4
+    tag = panels(p).tag;
+    tmp = load(fullfile(saveFolder, ['recordings_active_' tag '.mat']));
+    recordings.(tag).new     = tmp.rec_active.new;
+    recordings.(tag).old1    = tmp.rec_active.old1;
+    recordings.(tag).old2    = tmp.rec_active.old2;
+    recordings.(tag).sf_new  = tmp.rec_active.sf_new;
+    recordings.(tag).sf_old1 = tmp.rec_active.sf_old1;
+    recordings.(tag).sf_old2 = tmp.rec_active.sf_old2;
+    fprintf('✅ %s loaded.\n', tag);
+end
+disp('✅ All data loaded — ready to run figures.');
 
 %% FIGURE 2A
 % Re-run freely without reloading data
@@ -504,71 +504,100 @@ end
 
 clim_new_global = prctile(S_all_new(:), [2 98]);
 clim_old_global = prctile(S_all_old(:), [2 98]);
-%% Spectrograms 2x4 (System vs DIVs) + LFP traces = 4x4   : FIGURE 2C
+%% ===================== FIGURE 2C: 8x4 RAW + LFP + SMOOTHED + SPECTROGRAM =====================
 
-% FIGURE 2C output folder
 fig2C_folder = fullfile(outputFolder, 'Spectrograms', 'FIGURE2C');
 if ~exist(fig2C_folder, 'dir'), mkdir(fig2C_folder); end
 
-% --- Spectrogram parameters ---
+% --- Parameters ---
 win_spec      = hamming(2048);
 noverlap_spec = 1024;
 nfft_spec     = 2048;
-freq_max = lfp_cut;  % 250 Hz
+freq_max      = lfp_cut;
+t_start       = 0;
+t_end         = 60;
+smooth_window = 500;   % samples for gaussian smoothing — adjust as needed
+panel_order   = [4, 3, 2, 1];  % DIV ascending: 48, 53, 55, 60
 
-% --- Time window to display (seconds) ---
-t_start = 0;
-t_end   = 60;   % show first 60 seconds — adjust as needed
-
-fig = figure('Visible','off','Position',[100 100 1800 900]);
-tl  = tiledlayout(4, 4, 'TileSpacing','compact','Padding','loose');
-
-% Reorder panels: ascending DIV left to right (48, 53, 55, 60)
-panel_order = [4, 3, 2, 1];
+% --- Compute global color limits across all panels ---
+S_all_new = [];
+S_all_old = [];
 
 for pp = 1:4
-    p = panel_order(pp);
+    p   = panel_order(pp);
     tag = panels(p).tag;
 
-    % --- Filter coefficients ---
-    [b_new, a_new] = butter(3, lfp_cut/(recordings.(tag).sf_new/2),  'low');
-
+    [b_new, a_new] = butter(3, lfp_cut/(recordings.(tag).sf_new/2), 'low');
     if strcmp(repSys_old, 'old1')
         sf_old  = recordings.(tag).sf_old1;
         rec_old = recordings.(tag).old1;
-        [b_old, a_old] = butter(3, lfp_cut/(sf_old/2), 'low');
     else
         sf_old  = recordings.(tag).sf_old2;
         rec_old = recordings.(tag).old2;
-        [b_old, a_old] = butter(3, lfp_cut/(sf_old/2), 'low');
     end
+    [b_old, a_old] = butter(3, lfp_cut/(sf_old/2), 'low');
 
-    % --- Extract representative electrode signals ---
+    lfp_new = filtfilt(b_new, a_new, recordings.(tag).new.(repWell_new).(repElec_new));
+    lfp_old = filtfilt(b_old, a_old, rec_old.(repWell_old).(repElec_old));
+
+    [s_new, f_new, ts_new] = spectrogram(lfp_new, win_spec, noverlap_spec, nfft_spec, recordings.(tag).sf_new);
+    [s_old, f_old, ts_old] = spectrogram(lfp_old, win_spec, noverlap_spec, nfft_spec, sf_old);
+
+    idxF_new = f_new <= freq_max;
+    idxF_old = f_old <= freq_max;
+    idxT_new = ts_new >= t_start & ts_new <= t_end;
+    idxT_old = ts_old >= t_start & ts_old <= t_end;
+
+    S_all_new = [S_all_new, 10*log10(abs(s_new(idxF_new, idxT_new)).^2)];
+    S_all_old = [S_all_old, 10*log10(abs(s_old(idxF_old, idxT_old)).^2)];
+end
+
+clim_new_global = prctile(S_all_new(:), [2 98]);
+clim_old_global = prctile(S_all_old(:), [2 98]);
+
+% --- Figure ---
+fig = figure('Visible','off','Position',[100 100 1800 1400]);
+tl  = tiledlayout(8, 4, 'TileSpacing','compact','Padding','loose');
+
+for pp = 1:4
+    p   = panel_order(pp);
+    tag = panels(p).tag;
+
+    % --- Filter coefficients ---
+    [b_new, a_new] = butter(3, lfp_cut/(recordings.(tag).sf_new/2), 'low');
+    if strcmp(repSys_old, 'old1')
+        sf_old  = recordings.(tag).sf_old1;
+        rec_old = recordings.(tag).old1;
+    else
+        sf_old  = recordings.(tag).sf_old2;
+        rec_old = recordings.(tag).old2;
+    end
+    [b_old, a_old] = butter(3, lfp_cut/(sf_old/2), 'low');
+
+    % --- Raw signals ---
     raw_new = recordings.(tag).new.(repWell_new).(repElec_new);
     raw_old = rec_old.(repWell_old).(repElec_old);
 
-    % --- LFP filter ---
+    % --- LFP filtered ---
     lfp_new = filtfilt(b_new, a_new, raw_new);
     lfp_old = filtfilt(b_old, a_old, raw_old);
 
+    % --- LFP smoothed ---
+    lfp_new_smooth = smoothdata(lfp_new, 'gaussian', smooth_window);
+    lfp_old_smooth = smoothdata(lfp_old, 'gaussian', smooth_window);
+
     % --- Time vectors ---
-    t_new = (0:length(lfp_new)-1) / recordings.(tag).sf_new;
-    t_old = (0:length(lfp_old)-1) / sf_old;
+    t_new = (0:length(raw_new)-1) / recordings.(tag).sf_new;
+    t_old = (0:length(raw_old)-1) / sf_old;
 
     % --- Crop to display window ---
     idx_new = t_new >= t_start & t_new <= t_end;
     idx_old = t_old >= t_start & t_old <= t_end;
 
-    lfp_new_crop = lfp_new(idx_new);
-    lfp_old_crop = lfp_old(idx_old);
-    t_new_crop   = t_new(idx_new);
-    t_old_crop   = t_old(idx_old);
-
     % --- Spectrogram ---
     [s_new, f_new, ts_new] = spectrogram(lfp_new, win_spec, noverlap_spec, nfft_spec, recordings.(tag).sf_new);
     [s_old, f_old, ts_old] = spectrogram(lfp_old, win_spec, noverlap_spec, nfft_spec, sf_old);
 
-    % Keep only frequencies up to freq_max and time window
     idxF_new = f_new <= freq_max;
     idxF_old = f_old <= freq_max;
     idxT_new = ts_new >= t_start & ts_new <= t_end;
@@ -576,27 +605,42 @@ for pp = 1:4
 
     S_new = 10*log10(abs(s_new(idxF_new, idxT_new)).^2);
     S_old = 10*log10(abs(s_old(idxF_old, idxT_old)).^2);
-    f_new_plot  = f_new(idxF_new);
-    f_old_plot  = f_old(idxF_old);
-    ts_new_plot = ts_new(idxT_new);
-    ts_old_plot = ts_old(idxT_old);
 
     % ----------------------------------------------------------------
-    % ROW 1: NEW LFP
+    % ROW 1: NEW RAW
     % ----------------------------------------------------------------
     nexttile(pp);
-    plot(t_new_crop, lfp_new_crop * 1e6, 'Color', c_new, 'LineWidth', 0.8);
-    xlabel('Time (s)');
+    plot(t_new(idx_new), raw_new(idx_new) * 1e6, 'Color', c_new, 'LineWidth', 0.5);
+    ylabel('Amplitude (µV)');
+    title(['New RAW - ' panels(p).DIV_label]);
+    xlim([t_start t_end]);
+    grid on;
+
+    % ----------------------------------------------------------------
+    % ROW 2: NEW LFP
+    % ----------------------------------------------------------------
+    nexttile(pp + 4);
+    plot(t_new(idx_new), lfp_new(idx_new) * 1e6, 'Color', c_new, 'LineWidth', 0.5);
     ylabel('Amplitude (µV)');
     title(['New LFP - ' panels(p).DIV_label]);
     xlim([t_start t_end]);
     grid on;
 
     % ----------------------------------------------------------------
-    % ROW 2: NEW SPECTROGRAM
+    % ROW 3: NEW LFP SMOOTHED
     % ----------------------------------------------------------------
-    nexttile(pp + 4);
-    imagesc(ts_new_plot, f_new_plot, S_new);
+    nexttile(pp + 8);
+    plot(t_new(idx_new), lfp_new_smooth(idx_new) * 1e6, 'Color', c_new, 'LineWidth', 1.5);
+    ylabel('Amplitude (µV)');
+    title(['New Smooth - ' panels(p).DIV_label]);
+    xlim([t_start t_end]);
+    grid on;
+
+    % ----------------------------------------------------------------
+    % ROW 4: NEW SPECTROGRAM
+    % ----------------------------------------------------------------
+    nexttile(pp + 12);
+    imagesc(ts_new(idxT_new), f_new(idxF_new), S_new);
     axis xy;
     colormap(gca, 'jet');
     clim(clim_new_global);
@@ -606,21 +650,40 @@ for pp = 1:4
     colorbar;
 
     % ----------------------------------------------------------------
-    % ROW 3: OLD LFP
+    % ROW 5: OLD RAW
     % ----------------------------------------------------------------
-    nexttile(pp + 8);
-    plot(t_old_crop, lfp_old_crop * 1e6, 'Color', c_old, 'LineWidth', 0.8);
-    xlabel('Time (s)');
+    nexttile(pp + 16);
+    plot(t_old(idx_old), raw_old(idx_old) * 1e6, 'Color', c_old, 'LineWidth', 0.5);
+    ylabel('Amplitude (µV)');
+    title(['Old RAW - ' panels(p).DIV_label]);
+    xlim([t_start t_end]);
+    grid on;
+
+    % ----------------------------------------------------------------
+    % ROW 6: OLD LFP
+    % ----------------------------------------------------------------
+    nexttile(pp + 20);
+    plot(t_old(idx_old), lfp_old(idx_old) * 1e6, 'Color', c_old, 'LineWidth', 0.5);
     ylabel('Amplitude (µV)');
     title(['Old LFP - ' panels(p).DIV_label]);
     xlim([t_start t_end]);
     grid on;
 
     % ----------------------------------------------------------------
-    % ROW 4: OLD SPECTROGRAM
+    % ROW 7: OLD LFP SMOOTHED
     % ----------------------------------------------------------------
-    nexttile(pp + 12);
-    imagesc(ts_old_plot, f_old_plot, S_old);
+    nexttile(pp + 24);
+    plot(t_old(idx_old), lfp_old_smooth(idx_old) * 1e6, 'Color', c_old, 'LineWidth', 1.5);
+    ylabel('Amplitude (µV)');
+    title(['Old Smooth - ' panels(p).DIV_label]);
+    xlim([t_start t_end]);
+    grid on;
+
+    % ----------------------------------------------------------------
+    % ROW 8: OLD SPECTROGRAM
+    % ----------------------------------------------------------------
+    nexttile(pp + 28);
+    imagesc(ts_old(idxT_old), f_old(idxF_old), S_old);
     axis xy;
     colormap(gca, 'jet');
     clim(clim_old_global);
@@ -636,10 +699,10 @@ title(tl, ...
     repWell_new, repElec_new, repWell_old, repElec_old, repSys_old), ...
     'FontSize', 11);
 
-exportgraphics(fig, fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_4x4.png'), 'Resolution', 300);
-savefig(fig,        fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_4x4.fig'));
+exportgraphics(fig, fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_8x4.png'), 'Resolution', 300);
+savefig(fig,        fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_8x4.fig'));
 close(fig);
-disp('✅ Figure 4x4 LFP + Spectrogram saved.');
+disp('✅ Figure 2C 8x4 saved.');
 
 %% ===================== FIGURE 2B: Total LFP Power vs DIV =====================
 
