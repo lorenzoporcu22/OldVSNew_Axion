@@ -60,7 +60,7 @@ lfp_cut      = 250;
 window_psd   = hamming(4096);
 noverlap_psd = 2048;
 nfft_psd     = 8192;
-min_active_electrodes = 1;  % già definito nel Block 5, mettilo nei parametri fissi
+min_active_electrodes = 3;  
 c_new = [0.85 0.15 0.15];
 c_old = [0.15 0.35 0.85];
 
@@ -365,9 +365,12 @@ end
 
 %% ===================== BLOCK 5: REPRESENTATIVE ELECTRODE SELECTION =====================
 
-min_active_electrodes = 2;
+min_active_electrodes = 3;
 ref_panel             = 1;  % DIV60 — highest DIV, most stable activity
 tag                   = panels(ref_panel).tag;
+
+% panels_for_common     = panels(1:3);  % DIV60, DIV55, DIV53 — exclude DIV48 for New
+panels_for_common = panels;  % all DIVs
 
 [b_new,  a_new]  = butter(3, lfp_cut/(recordings.(tag).sf_new/2),  'low');
 [b_old1, a_old1] = butter(3, lfp_cut/(recordings.(tag).sf_old1/2), 'low');
@@ -378,27 +381,21 @@ tag                   = panels(ref_panel).tag;
     recordings.(tag).new, wells_new, activeElec.(tag).new, ...
     b_new, a_new, recordings.(tag).sf_new, ...
     window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes, ...
-    activeElec, panels, 'new', wells_new);
-
-fprintf('NEW  → representative well: %s, electrode: %s\n', repWell_new, repElec_new);
+    activeElec, panels_for_common, 'new');
 
 % --- OLD1 ---
 [repWell_old1, repElec_old1] = selectRepresentativeElectrode(...
     recordings.(tag).old1, wells_old1, activeElec.(tag).old1, ...
     b_old1, a_old1, recordings.(tag).sf_old1, ...
     window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes, ...
-    activeElec, panels, 'old1', wells_old1);
-
-fprintf('OLD1 → representative well: %s, electrode: %s\n', repWell_old1, repElec_old1);
+    activeElec, panels_for_common, 'old1');
 
 % --- OLD2 ---
 [repWell_old2, repElec_old2] = selectRepresentativeElectrode(...
     recordings.(tag).old2, wells_old2, activeElec.(tag).old2, ...
     b_old2, a_old2, recordings.(tag).sf_old2, ...
     window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes, ...
-    activeElec, panels, 'old2', wells_old2);
-
-fprintf('OLD2 → representative well: %s, electrode: %s\n', repWell_old2, repElec_old2);
+    activeElec, panels_for_common, 'old2');
 
 % --- Pick best Old between old1 and old2 ---
 idx_old1 = find(strcmp(cellstr([activeElec.(tag).old1.well]), repWell_old1));
@@ -419,15 +416,23 @@ end
 repWell_new = char(repWell_new);
 repElec_new = char(repElec_new);
 
-fprintf('OLD  → using %s: well %s, electrode %s\n', repSys_old, repWell_old, repElec_old);
+fprintf('NEW  → well: %s, electrode: %s\n', repWell_new, repElec_new);
+fprintf('OLD  → well: %s, electrode: %s (%s)\n', repWell_old, repElec_old, repSys_old);
+
+% --- Save to file ---
+fid = fopen(fullfile(outputFolder, 'representative_electrode_info.txt'), 'w');
+fprintf(fid, 'NEW  → well: %s, electrode: %s\n', repWell_new, repElec_new);
+fprintf(fid, 'OLD  → well: %s, electrode: %s (%s)\n', repWell_old, repElec_old, repSys_old);
+fclose(fid);
+disp('✅ Representative electrode selection completed.');
 
 %% ===================== HELPER FUNCTION =====================
 
-function [repWell, repElec] = selectRepresentativeElectrode(rec, wells, activeElecPerWell, b, a, sf, window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active, allActiveElec, allPanels, system, wellsList)
+function [repWell, repElec] = selectRepresentativeElectrode(rec, wells, activeElecPerWell, b, a, sf, window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active, allActiveElec, allPanels, system)
 
-    % Step 1: find wells with >= min_active electrodes
-    wellPSDs  = {};
-    wellNames = {};
+    wellPSDs       = {};
+    wellNames      = {};
+    wellCommonElec = {};
 
     for w = 1:length(wells)
         wName = wells{w};
@@ -438,56 +443,60 @@ function [repWell, repElec] = selectRepresentativeElectrode(rec, wells, activeEl
         activeNames = activeElecPerWell(wellIdx).activeElectrodes;
         if length(activeNames) < min_active, continue; end
 
+        % Find electrodes active in ALL DIVs
+        commonElec = activeNames;
+        for p = 1:length(allPanels)
+            tag  = allPanels(p).tag;
+            wIdx = find(strcmp(cellstr([allActiveElec.(tag).(system).well]), wName));
+            if isempty(wIdx)
+                commonElec = {};
+                break
+            end
+            commonElec = intersect(commonElec, allActiveElec.(tag).(system)(wIdx).activeElectrodes);
+        end
+
+        if isempty(commonElec), continue; end
+
+        fprintf('  Well %s (%s): %d electrodes active in all DIVs → %s\n', ...
+            wName, system, length(commonElec), strjoin(commonElec, ', '));
+
+        % Compute mean PSD using only common electrodes
         elecPSD = [];
-        for e = 1:length(activeNames)
-            eName = activeNames{e};
+        for e = 1:length(commonElec)
+            eName = char(commonElec{e});
             if ~isfield(rec.(wName), eName), continue; end
             data     = filtfilt(b, a, rec.(wName).(eName));
             [pxx, f] = pwelch(data, window_psd, noverlap_psd, nfft_psd, sf);
             idxF     = f <= lfp_cut;
             if isempty(elecPSD)
-                elecPSD = zeros(sum(idxF), length(activeNames));
+                elecPSD = zeros(sum(idxF), length(commonElec));
             end
             elecPSD(:, e) = pxx(idxF);
         end
 
         if isempty(elecPSD), continue; end
-        wellPSDs{end+1}  = mean(elecPSD, 2);
-        wellNames{end+1} = wName;
+
+        wellPSDs{end+1}       = mean(elecPSD, 2);
+        wellNames{end+1}      = wName;
+        wellCommonElec{end+1} = commonElec;
     end
 
     if isempty(wellPSDs)
-        error('No wells passed the min_active_electrodes threshold (%d). Lower N.', min_active);
+        error('No well has electrodes active in all DIVs for system %s. Lower min_active.', system);
     end
 
-    % Step 2: find representative well (closest to global mean)
+    fprintf('\n  Candidate wells: %s\n', strjoin(wellNames, ', '));
+
+    % Select well closest to global mean
     globalMean = mean(cat(2, wellPSDs{:}), 2);
     distances  = cellfun(@(p) norm(p - globalMean), wellPSDs);
     [~, bestW] = min(distances);
     repWell    = wellNames{bestW};
+    commonElec = wellCommonElec{bestW};
 
-    % Step 3: find electrodes active in ALL DIVs for this well and system
-    wellIdx     = find(strcmp(cellstr([activeElecPerWell.well]), repWell));
-    commonElec  = activeElecPerWell(wellIdx).activeElectrodes;
+    fprintf('  → Representative well: %s\n', repWell);
 
-    for p = 1:length(allPanels)
-        tag  = allPanels(p).tag;
-        wIdx = find(strcmp(cellstr([allActiveElec.(tag).(system).well]), repWell));
-        if isempty(wIdx)
-            commonElec = {};
-            break
-        end
-        commonElec = intersect(commonElec, allActiveElec.(tag).(system)(wIdx).activeElectrodes);
-    end
-
-    if isempty(commonElec)
-        error('No electrode active in all DIVs for well %s system %s. Lower min_active or change well.', repWell, system);
-    end
-
-    fprintf('  Well %s (%s): %d electrodes active in all DIVs → %s\n', ...
-        repWell, system, length(commonElec), strjoin(commonElec, ', '));
-
-    % Step 4: find most representative electrode among common ones
+    % Select most representative electrode among common ones
     elecPSDs   = [];
     validNames = {};
 
@@ -505,7 +514,7 @@ function [repWell, repElec] = selectRepresentativeElectrode(rec, wells, activeEl
     end
 
     if isempty(validNames)
-        error('No valid electrodes found in well %s for PSD computation.', repWell);
+        error('No valid electrodes found in well %s for system %s.', repWell, system);
     end
 
     wellMean   = mean(elecPSDs, 2);
@@ -513,8 +522,17 @@ function [repWell, repElec] = selectRepresentativeElectrode(rec, wells, activeEl
     [~, bestE] = min(distances);
     repElec    = validNames{bestE};
 
+    fprintf('  → Representative electrode: %s\n', repElec);
+
 end
+
 %% ===================== FIGURE 2C: 8x4 RAW + LFP + SMOOTHED + SPECTROGRAM =====================
+%manual choice for graph quality
+repSys_old  = 'old1';
+repWell_old = 'F5';
+repElec_old = 'E11';
+
+
 
 fig2C_folder = fullfile(outputFolder, 'Spectrograms', 'FIGURE2C');
 if ~exist(fig2C_folder, 'dir'), mkdir(fig2C_folder); end
@@ -524,9 +542,14 @@ noverlap_spec = 1024;
 nfft_spec     = 2048;
 freq_max      = lfp_cut;
 t_start       = 0;
-t_end         = 60;
+t_end         = 150;
 smooth_window = 500;
 panel_order   = [4, 3, 2, 1];
+
+repWell_new = char(repWell_new);
+repElec_new = char(repElec_new);
+repWell_old = char(repWell_old);
+repElec_old = char(repElec_old);
 
 results2C = struct('raw_new', {}, 'raw_old', {}, ...
                    'lfp_new', {}, 'lfp_old', {}, ...
@@ -536,20 +559,18 @@ results2C = struct('raw_new', {}, 'raw_old', {}, ...
                    'ts_new_plot', {}, 'ts_old_plot', {}, ...
                    't_new', {}, 't_old', {}, ...
                    'idx_new', {}, 'idx_old', {}, ...
-                   'panel_idx', {});
+                   'panel_idx', {}, 'valid', {});
 
 S_all_new = [];
 S_all_old = [];
-
-repWell_new = 'A2';
-repElec_new = 'E34';
-repWell_old = 'F2';   % metti il valore che hai visto stampato
-repElec_old = 'E13';  % metti il valore che hai visto stampato
 
 % --- STEP 1: Pre-compute all signals and spectrograms ---
 for pp = 1:4
     p   = panel_order(pp);
     tag = panels(p).tag;
+
+    results2C(pp).panel_idx = p;
+    results2C(pp).valid     = true;
 
     [b_new, a_new] = butter(3, lfp_cut/(recordings.(tag).sf_new/2), 'low');
     if strcmp(repSys_old, 'old1')
@@ -560,6 +581,20 @@ for pp = 1:4
         rec_old = recordings.(tag).old2;
     end
     [b_old, a_old] = butter(3, lfp_cut/(sf_old/2), 'low');
+
+    % Check if representative electrode exists for this DIV
+    if ~isfield(recordings.(tag).new, repWell_new) || ...
+       ~isfield(recordings.(tag).new.(repWell_new), repElec_new)
+        warning('New rep electrode not found at %s, skipping.', tag);
+        results2C(pp).valid = false;
+        continue
+    end
+    if ~isfield(rec_old, repWell_old) || ...
+       ~isfield(rec_old.(repWell_old), repElec_old)
+        warning('Old rep electrode not found at %s, skipping.', tag);
+        results2C(pp).valid = false;
+        continue
+    end
 
     % Raw
     raw_new = recordings.(tag).new.(repWell_new).(repElec_new);
@@ -593,11 +628,9 @@ for pp = 1:4
     S_new = 10*log10(abs(s_new(idxF_new, idxT_new)).^2);
     S_old = 10*log10(abs(s_old(idxF_old, idxT_old)).^2);
 
-    % Accumulate for global color limits
     S_all_new = [S_all_new, S_new];
     S_all_old = [S_all_old, S_old];
 
-    % Store results
     results2C(pp).raw_new        = raw_new;
     results2C(pp).raw_old        = raw_old;
     results2C(pp).lfp_new        = lfp_new;
@@ -614,12 +647,10 @@ for pp = 1:4
     results2C(pp).t_old          = t_old;
     results2C(pp).idx_new        = idx_new;
     results2C(pp).idx_old        = idx_old;
-    results2C(pp).panel_idx      = p;
 
     fprintf('✅ %s pre-computed.\n', panels(p).tag);
 end
 
-% Global color limits
 clim_new_global = prctile(S_all_new(:), [2 98]);
 clim_old_global = prctile(S_all_old(:), [2 98]);
 
@@ -628,23 +659,34 @@ fig = figure('Visible','off','Position',[100 100 1800 1400]);
 tl  = tiledlayout(8, 4, 'TileSpacing','compact','Padding','loose');
 
 for pp = 1:4
-    p             = results2C(pp).panel_idx;
-    raw_new       = results2C(pp).raw_new;
-    raw_old       = results2C(pp).raw_old;
-    lfp_new       = results2C(pp).lfp_new;
-    lfp_old       = results2C(pp).lfp_old;
+    p = results2C(pp).panel_idx;
+
+    if ~results2C(pp).valid
+        for row = 0:7
+            nexttile(pp + row*4);
+            text(0.5, 0.5, 'No data', 'HorizontalAlignment', 'center');
+            axis off;
+            title([panels(p).DIV_label ' - No data']);
+        end
+        continue
+    end
+
+    raw_new        = results2C(pp).raw_new;
+    raw_old        = results2C(pp).raw_old;
+    lfp_new        = results2C(pp).lfp_new;
+    lfp_old        = results2C(pp).lfp_old;
     lfp_new_smooth = results2C(pp).lfp_new_smooth;
     lfp_old_smooth = results2C(pp).lfp_old_smooth;
-    S_new         = results2C(pp).S_new;
-    S_old         = results2C(pp).S_old;
-    f_new_plot    = results2C(pp).f_new_plot;
-    f_old_plot    = results2C(pp).f_old_plot;
-    ts_new_plot   = results2C(pp).ts_new_plot;
-    ts_old_plot   = results2C(pp).ts_old_plot;
-    t_new         = results2C(pp).t_new;
-    t_old         = results2C(pp).t_old;
-    idx_new       = results2C(pp).idx_new;
-    idx_old       = results2C(pp).idx_old;
+    S_new          = results2C(pp).S_new;
+    S_old          = results2C(pp).S_old;
+    f_new_plot     = results2C(pp).f_new_plot;
+    f_old_plot     = results2C(pp).f_old_plot;
+    ts_new_plot    = results2C(pp).ts_new_plot;
+    ts_old_plot    = results2C(pp).ts_old_plot;
+    t_new          = results2C(pp).t_new;
+    t_old          = results2C(pp).t_old;
+    idx_new        = results2C(pp).idx_new;
+    idx_old        = results2C(pp).idx_old;
 
     % ROW 1: NEW RAW
     nexttile(pp);
@@ -720,17 +762,15 @@ end
 
 title(tl, 'LFP signal and spectrogram: New vs Old Axion system', 'FontSize', 13);
 
-% Save electrode info to file
 fid = fopen(fullfile(fig2C_folder, 'representative_electrode_info.txt'), 'w');
 fprintf(fid, 'NEW  → well: %s, electrode: %s\n', repWell_new, repElec_new);
 fprintf(fid, 'OLD  → well: %s, electrode: %s (%s)\n', repWell_old, repElec_old, repSys_old);
 fclose(fid);
 
-exportgraphics(fig, fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_8x4.png'), 'Resolution', 300);
-savefig(fig,        fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_8x4.fig'));
+exportgraphics(fig, fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_8x4_150s.png'), 'Resolution', 300);
+savefig(fig,        fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_8x4_150s.fig'));
 close(fig);
 disp('✅ Figure 2C 8x4 saved.');
-
 %% ===================== FIGURE 2B: Total LFP Power vs DIV =====================
 
 fig2B_folder = fullfile(outputFolder, 'LFP_PSD', 'FIGURE2B');
