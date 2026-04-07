@@ -202,50 +202,83 @@ for p = 1:4
 end
 disp('✅ All data loaded — ready to run figures.');
 
-%% FIGURE 2A
-% Re-run freely without reloading data
+%% ===================== FIGURE 2A: LFP PSD overlay 1x4 =====================
 
-% FIGURE 2A output folder
 fig2A_folder = fullfile(outputFolder, 'LFP_PSD', 'FIGURE2A');
 if ~exist(fig2A_folder, 'dir'), mkdir(fig2A_folder); end
 
-fig = figure('Visible','off','Position',[100 100 1800 450]);
-t   = tiledlayout(1, 4, 'TileSpacing','compact','Padding','loose');
+panel_order = [4, 3, 2, 1];  % DIV ascending: 48, 53, 55, 60
+min_active_electrodes = 3;
+freq_max = lfp_cut;
 
-for p = 1:4
+%% --- Pre-compute global Y limits ---
+y_min_global =  Inf;
+y_max_global = -Inf;
+
+for pp = 1:4
+    p   = panel_order(pp);
     tag = panels(p).tag;
 
-    % --- Filter coefficients ---
     [b_new,  a_new]  = butter(3, lfp_cut/(recordings.(tag).sf_new/2),  'low');
     [b_old1, a_old1] = butter(3, lfp_cut/(recordings.(tag).sf_old1/2), 'low');
     [b_old2, a_old2] = butter(3, lfp_cut/(recordings.(tag).sf_old2/2), 'low');
-
-    % --- Compute well-level PSDs (active electrodes only) ---
-   
 
     wellPSD_new  = computeWellPSD(recordings.(tag).new,  wells_new,  activeElec.(tag).new,  b_new,  a_new,  recordings.(tag).sf_new,  window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes);
     wellPSD_old1 = computeWellPSD(recordings.(tag).old1, wells_old1, activeElec.(tag).old1, b_old1, a_old1, recordings.(tag).sf_old1, window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes);
     wellPSD_old2 = computeWellPSD(recordings.(tag).old2, wells_old2, activeElec.(tag).old2, b_old2, a_old2, recordings.(tag).sf_old2, window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes);
 
-    % Pool Old1 + Old2
     wellPSD_old = [wellPSD_old1, wellPSD_old2];
 
-    % --- Frequency axis ---
-    [~, f] = pwelch(zeros(nfft_psd,1), window_psd, noverlap_psd, nfft_psd, recordings.(tag).sf_new);
-    f_plot = f(f <= lfp_cut);
-
-    % --- Mean and 95% CI across wells ---
-    n_new     = size(wellPSD_new, 2);
     mean_new  = mean(wellPSD_new, 2);
+    n_new     = size(wellPSD_new, 2);
     ci_up_new = mean_new + 1.96 * std(wellPSD_new, 0, 2) / sqrt(n_new);
     ci_lo_new = mean_new - 1.96 * std(wellPSD_new, 0, 2) / sqrt(n_new);
 
-    n_old     = size(wellPSD_old, 2);
     mean_old  = mean(wellPSD_old, 2);
+    n_old     = size(wellPSD_old, 2);
     ci_up_old = mean_old + 1.96 * std(wellPSD_old, 0, 2) / sqrt(n_old);
     ci_lo_old = mean_old - 1.96 * std(wellPSD_old, 0, 2) / sqrt(n_old);
 
-    % --- Plot panel ---
+    y_min_global = min(y_min_global, min([10*log10(ci_lo_new); 10*log10(ci_lo_old)]));
+    y_max_global = max(y_max_global, max([10*log10(ci_up_new); 10*log10(ci_up_old)]));
+end
+
+% Padding + force max to -110 as Oskari suggested
+y_min_global = floor(y_min_global - 2);
+y_max_global = -110;
+fprintf('Global Y limits: [%.1f, %.1f] dB/Hz\n', y_min_global, y_max_global);
+
+%% --- Plot ---
+fig = figure('Visible','off','Position',[100 100 1800 450]);
+t   = tiledlayout(1, 4, 'TileSpacing','compact','Padding','loose');
+
+for pp = 1:4
+    p   = panel_order(pp);
+    tag = panels(p).tag;
+
+    [b_new,  a_new]  = butter(3, lfp_cut/(recordings.(tag).sf_new/2),  'low');
+    [b_old1, a_old1] = butter(3, lfp_cut/(recordings.(tag).sf_old1/2), 'low');
+    [b_old2, a_old2] = butter(3, lfp_cut/(recordings.(tag).sf_old2/2), 'low');
+
+    wellPSD_new  = computeWellPSD(recordings.(tag).new,  wells_new,  activeElec.(tag).new,  b_new,  a_new,  recordings.(tag).sf_new,  window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes);
+    wellPSD_old1 = computeWellPSD(recordings.(tag).old1, wells_old1, activeElec.(tag).old1, b_old1, a_old1, recordings.(tag).sf_old1, window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes);
+    wellPSD_old2 = computeWellPSD(recordings.(tag).old2, wells_old2, activeElec.(tag).old2, b_old2, a_old2, recordings.(tag).sf_old2, window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active_electrodes);
+
+    wellPSD_old = [wellPSD_old1, wellPSD_old2];
+
+    [~, f] = pwelch(zeros(nfft_psd,1), window_psd, noverlap_psd, nfft_psd, recordings.(tag).sf_new);
+    f_plot = f(f <= lfp_cut);
+
+    mean_new  = mean(wellPSD_new, 2);
+    n_new     = size(wellPSD_new, 2);
+    ci_up_new = mean_new + 1.96 * std(wellPSD_new, 0, 2) / sqrt(n_new);
+    ci_lo_new = mean_new - 1.96 * std(wellPSD_new, 0, 2) / sqrt(n_new);
+
+    mean_old  = mean(wellPSD_old, 2);
+    n_old     = size(wellPSD_old, 2);
+    ci_up_old = mean_old + 1.96 * std(wellPSD_old, 0, 2) / sqrt(n_old);
+    ci_lo_old = mean_old - 1.96 * std(wellPSD_old, 0, 2) / sqrt(n_old);
+
     nexttile;
     hold on;
 
@@ -262,6 +295,7 @@ for p = 1:4
     xlabel('Frequency (Hz)');
     ylabel('Power (dB/Hz)');
     title(panels(p).DIV_label);
+    ylim([y_min_global y_max_global]);
     legend show;
     grid on;
     hold off;
@@ -273,7 +307,7 @@ title(t, 'LFP PSD: New vs Old across DIVs (mean ± 95% CI)', 'FontSize', 13);
 exportgraphics(fig, fullfile(fig2A_folder, 'Subplot_LFP_PSD_NewVsOld_4DIV.png'), 'Resolution', 300);
 savefig(fig,        fullfile(fig2A_folder, 'Subplot_LFP_PSD_NewVsOld_4DIV.fig'));
 close(fig);
-disp('✅ Subplot 1x4 LFP PSD saved.');
+disp('✅ Figure 2A saved.');
 
 %% PSD Function
 % step 1: for each well it checks the active electrode list, if the well
