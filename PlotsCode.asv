@@ -365,7 +365,7 @@ end
 
 %% ===================== BLOCK 5: REPRESENTATIVE ELECTRODE SELECTION =====================
 
-min_active_electrodes = 2;
+min_active_electrodes = 3;
 ref_panel             = 1;  % DIV60 — highest DIV, most stable activity
 tag                   = panels(ref_panel).tag;
 
