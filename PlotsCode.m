@@ -1,4 +1,4 @@
-%% Subplot 1x4: LFP PSD New vs Old - 4 DIV panels
+%% Script to generate LFPs figures
 addpath(genpath('S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\MEA Analysis Introduction\MEA Analysis Introduction\AxionFileInput'));
 %% ===================== USER PARAMETERS =====================
 
@@ -67,7 +67,7 @@ c_old = [0.15 0.35 0.85];
 outputFolder = 'S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\Lorenzo\OldVSNew';
 if ~exist(outputFolder, 'dir'), mkdir(outputFolder); end
 
-% %% BLOCK 1: LOAD RAW RECORDINGS 
+%% BLOCK 1: LOAD RAW RECORDINGS 
 % % Run this block once — it is slow
 % 
 % recordings = struct();
@@ -211,7 +211,7 @@ panel_order = [4, 3, 2, 1];  % DIV ascending: 48, 53, 55, 60
 min_active_electrodes = 3;
 freq_max = lfp_cut;
 
-%% --- Pre-compute global Y limits ---
+% --- Pre-compute global Y limits ---
 y_min_global =  Inf;
 y_max_global = -Inf;
 
@@ -248,7 +248,7 @@ y_min_global = floor(y_min_global - 2);
 y_max_global = -110;
 fprintf('Global Y limits: [%.1f, %.1f] dB/Hz\n', y_min_global, y_max_global);
 
-%% --- Plot ---
+% --- Plot ---
 fig = figure('Visible','off','Position',[100 100 1800 450]);
 t   = tiledlayout(1, 4, 'TileSpacing','compact','Padding','loose');
 
@@ -500,7 +500,7 @@ function [repWell, repElec] = selectRepresentativeElectrode(rec, wells, activeEl
     repElec     = validNames{bestE};
 
 end
-%%
+%% Additional code for figure 2C axis limits
 % --- Compute global color limits across all panels ---
 S_all_new = [];
 S_all_old = [];
