@@ -541,11 +541,11 @@ results2C = struct('raw_new', {}, 'raw_old', {}, ...
 S_all_new = [];
 S_all_old = [];
 
-repWell_new = 'A2';
+repWell_new = 'A8';
 repElec_new = 'E34';
 repWell_old = 'F2';   % metti il valore che hai visto stampato
 repElec_old = 'E13';  % metti il valore che hai visto stampato
-
+repSys_old = 'old1';
 % --- STEP 1: Pre-compute all signals and spectrograms ---
 for pp = 1:4
     p   = panel_order(pp);
@@ -726,8 +726,8 @@ fprintf(fid, 'NEW  → well: %s, electrode: %s\n', repWell_new, repElec_new);
 fprintf(fid, 'OLD  → well: %s, electrode: %s (%s)\n', repWell_old, repElec_old, repSys_old);
 fclose(fid);
 
-exportgraphics(fig, fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_8x4.png'), 'Resolution', 300);
-savefig(fig,        fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_8x4.fig'));
+exportgraphics(fig, fullfile(fig2C_folder, 'LFP_Spectrogram_NewVsOld_try.png'), 'Resolution', 300);
+
 close(fig);
 disp('✅ Figure 2C 8x4 saved.');
 
