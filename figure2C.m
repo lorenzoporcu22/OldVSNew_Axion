@@ -22,8 +22,6 @@ if ~exist(fig2C3_folder, 'dir'), mkdir(fig2C3_folder); end
 
 lfp_cut       = 250;
 freq_max      = lfp_cut;
-c_new         = [0.85 0.15 0.15];
-c_old         = [0.15 0.35 0.85];
 win_spec      = hamming(2048);
 noverlap_spec = 1024;
 nfft_spec     = 2048;
@@ -34,6 +32,14 @@ window_psd    = hamming(4096);
 noverlap_psd  = 2048;
 nfft_psd      = 8192;
 min_active_electrodes = 3;
+
+% --- Colors ---
+c_new_raw    = [0.85 0.15 0.15];
+c_new_lfp    = [0.92 0.45 0.45];
+c_new_smooth = [0.97 0.70 0.70];
+c_old_raw    = [0.10 0.25 0.75];
+c_old_lfp    = [0.35 0.55 0.90];
+c_old_smooth = [0.65 0.78 0.97];
 
 %% ===================== PANELS DEFINITION =====================
 
@@ -134,6 +140,23 @@ t_old = (0:length(raw_old)-1) / sf_old;
 idx_new = t_new >= t_start & t_new <= t_end;
 idx_old = t_old >= t_start & t_old <= t_end;
 
+% --- Shared Y limits (robust) ---
+raw_all = [raw_new(idx_new); raw_old(idx_old)] * 1e6;
+raw_all = raw_all(:);
+raw_all = raw_all(isfinite(raw_all));
+raw_ylim = safeYLim(raw_all);
+
+lfp_all = [lfp_new(idx_new); lfp_old(idx_old)] * 1e6;
+lfp_all = lfp_all(:);
+lfp_all = lfp_all(isfinite(lfp_all));
+lfp_ylim = safeYLim(lfp_all);
+
+smo_all = [lfp_new_smooth(idx_new); lfp_old_smooth(idx_old)] * 1e6;
+smo_all = smo_all(:);
+smo_all = smo_all(isfinite(smo_all));
+smooth_ylim = safeYLim(smo_all);
+
+% --- Spectrograms ---
 [s_new, f_new, ts_new] = spectrogram(lfp_new, win_spec, noverlap_spec, nfft_spec, recordings.(tag).sf_new);
 [s_old, f_old, ts_old] = spectrogram(lfp_old, win_spec, noverlap_spec, nfft_spec, sf_old);
 
@@ -157,19 +180,19 @@ tl  = tiledlayout(2, 4, 'TileSpacing','compact','Padding','loose');
 
 % ROW 1: NEW
 nexttile(1);
-plot(t_new(idx_new), raw_new(idx_new) * 1e6, 'Color', c_new, 'LineWidth', 0.5);
+plot(t_new(idx_new), raw_new(idx_new) * 1e6, 'Color', c_new_raw, 'LineWidth', 0.5);
 ylabel('Amplitude (µV)'); title(['New RAW - ' panels(p).DIV_label]);
-xlim([t_start t_end]); grid on;
+xlim([t_start t_end]); ylim(raw_ylim); grid on;
 
 nexttile(2);
-plot(t_new(idx_new), lfp_new(idx_new) * 1e6, 'Color', c_new, 'LineWidth', 0.5);
+plot(t_new(idx_new), lfp_new(idx_new) * 1e6, 'Color', c_new_lfp, 'LineWidth', 0.5);
 ylabel('Amplitude (µV)'); title(['New LFP - ' panels(p).DIV_label]);
-xlim([t_start t_end]); grid on;
+xlim([t_start t_end]); ylim(lfp_ylim); grid on;
 
 nexttile(3);
-plot(t_new(idx_new), lfp_new_smooth(idx_new) * 1e6, 'Color', c_new, 'LineWidth', 1.5);
+plot(t_new(idx_new), lfp_new_smooth(idx_new) * 1e6, 'Color', c_new_smooth, 'LineWidth', 1.5);
 ylabel('Amplitude (µV)'); title(['New Smooth - ' panels(p).DIV_label]);
-xlim([t_start t_end]); grid on;
+xlim([t_start t_end]); ylim(smooth_ylim); grid on;
 
 nexttile(4);
 imagesc(ts_new(idxT_new), f_new(idxF_new), S_new);
@@ -179,19 +202,19 @@ title(['New Spec - ' panels(p).DIV_label]); colorbar;
 
 % ROW 2: OLD
 nexttile(5);
-plot(t_old(idx_old), raw_old(idx_old) * 1e6, 'Color', c_old, 'LineWidth', 0.5);
+plot(t_old(idx_old), raw_old(idx_old) * 1e6, 'Color', c_old_raw, 'LineWidth', 0.5);
 ylabel('Amplitude (µV)'); title(['Old RAW - ' panels(p).DIV_label]);
-xlim([t_start t_end]); grid on;
+xlim([t_start t_end]); ylim(raw_ylim); grid on;
 
 nexttile(6);
-plot(t_old(idx_old), lfp_old(idx_old) * 1e6, 'Color', c_old, 'LineWidth', 0.5);
+plot(t_old(idx_old), lfp_old(idx_old) * 1e6, 'Color', c_old_lfp, 'LineWidth', 0.5);
 ylabel('Amplitude (µV)'); title(['Old LFP - ' panels(p).DIV_label]);
-xlim([t_start t_end]); grid on;
+xlim([t_start t_end]); ylim(lfp_ylim); grid on;
 
 nexttile(7);
-plot(t_old(idx_old), lfp_old_smooth(idx_old) * 1e6, 'Color', c_old, 'LineWidth', 1.5);
+plot(t_old(idx_old), lfp_old_smooth(idx_old) * 1e6, 'Color', c_old_smooth, 'LineWidth', 1.5);
 ylabel('Amplitude (µV)'); title(['Old Smooth - ' panels(p).DIV_label]);
-xlim([t_start t_end]); grid on;
+xlim([t_start t_end]); ylim(smooth_ylim); grid on;
 
 nexttile(8);
 imagesc(ts_old(idxT_old), f_old(idxF_old), S_old);
@@ -239,191 +262,16 @@ function wellPSD = computeWellPSD(rec, wells, activeElecPerWell, b, a, sf, windo
     end
 end
 
-%% ===================== EXPLORE: RAW TRACES — tutti i candidati, new + old1 + old2 =====================
-% Per ogni sistema: trova elettrodi attivi in tutti e 4 i DIV, plotta raw
-% Righe = elettrodi candidati, Colonne = 4 DIV (DIV48 → DIV60)
-
-raw_explore_folder = 'S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\Lorenzo\OldVSNew\Spectrograms\FIGURE2C\raw traces';
-if ~exist(raw_explore_folder, 'dir'), mkdir(raw_explore_folder); end
-
-t_explore_start = 0;
-t_explore_end   = 60;   % secondi — riduci ancora se vuoi più veloce
-panel_order_explore = [4, 3, 2, 1];  % DIV48 → DIV60
-
-systems = {'new', 'old1', 'old2'};
-wells_per_sys = {wells_new, wells_old1, wells_old2};
-colors_per_sys = {c_new, c_old, c_old};
-
-for s = 1:3
-    sys       = systems{s};
-    wells_sys = wells_per_sys{s};
-    col       = colors_per_sys{s};
-
-    % --- Trova candidati attivi in tutti e 4 i DIV ---
-    candidates_sys = struct('well', {}, 'elec', {});
-
-    for w = 1:length(wells_sys)
-        wName = wells_sys{w};
-
-        commonElec = [];
-        valid = true;
-        for p = 1:4
-            tag  = panels(p).tag;
-            ae   = activeElec.(tag).(sys);
-            wIdx = find(strcmp(cellstr([ae.well]), wName));
-            if isempty(wIdx), valid = false; break; end
-            elecs = ae(wIdx).activeElectrodes;
-            if isempty(commonElec)
-                commonElec = elecs;
-            else
-                commonElec = intersect(commonElec, elecs);
-            end
-            if isempty(commonElec), valid = false; break; end
-        end
-
-        if ~valid || isempty(commonElec), continue; end
-
-        for e = 1:length(commonElec)
-            candidates_sys(end+1).well = wName;
-            candidates_sys(end).elec   = char(commonElec{e});
-        end
+function yl = safeYLim(v)
+    if isempty(v)
+        yl = [-1 1];
+        return;
     end
-
-    fprintf('\n=== %s: %d candidati ===\n', sys, length(candidates_sys));
-    for c = 1:length(candidates_sys)
-        fprintf('  %d) %s / %s\n', c, candidates_sys(c).well, candidates_sys(c).elec);
+    vmin = min(v);
+    vmax = max(v);
+    pad  = max((vmax - vmin) * 0.1, 1);   % minimo 1 µV
+    yl   = [vmin - pad, vmax + pad];
+    if yl(1) >= yl(2)                      % safety fallback
+        yl = [yl(1) - 1, yl(1) + 1];
     end
-
-    if isempty(candidates_sys)
-        fprintf('  ⚠️ Nessun candidato per %s — skip.\n', sys);
-        continue
-    end
-
-    nCand = length(candidates_sys);
-
-    fig = figure('Visible', 'off', 'Position', [50 50 1800 max(400, nCand * 160)]);
-    tl  = tiledlayout(nCand, 4, 'TileSpacing', 'compact', 'Padding', 'loose');
-    title(tl, sprintf('RAW — %s — elettrodi attivi in tutti i DIV (%d–%d s)', ...
-        sys, t_explore_start, t_explore_end), 'FontSize', 12);
-
-    for c = 1:nCand
-        wName = candidates_sys(c).well;
-        eName = candidates_sys(c).elec;
-
-        for pp = 1:4
-            p   = panel_order_explore(pp);
-            tag = panels(p).tag;
-
-            nexttile((c-1)*4 + pp);
-
-            % Selezione recording e sf corretti
-            switch sys
-                case 'new'
-                    rec_exp = recordings.(tag).new;
-                    sf_exp  = recordings.(tag).sf_new;
-                case 'old1'
-                    rec_exp = recordings.(tag).old1;
-                    sf_exp  = recordings.(tag).sf_old1;
-                case 'old2'
-                    rec_exp = recordings.(tag).old2;
-                    sf_exp  = recordings.(tag).sf_old2;
-            end
-
-            if ~isfield(rec_exp, wName) || ~isfield(rec_exp.(wName), eName)
-                text(0.5, 0.5, 'no data', 'HorizontalAlignment', 'center');
-                axis off;
-            else
-                raw = rec_exp.(wName).(eName);
-                t   = (0:length(raw)-1) / sf_exp;
-                idx = t >= t_explore_start & t <= t_explore_end;
-                plot(t(idx), raw(idx) * 1e6, 'Color', col, 'LineWidth', 0.4);
-                xlim([t_explore_start t_explore_end]);
-                grid on;
-            end
-
-            if c == 1,  title(panels(p).DIV_label); end
-            if pp == 1, ylabel(sprintf('%s / %s', wName, eName), 'FontSize', 7); end
-        end
-    end
-
-    fname = sprintf('raw_candidates_%s_%d-%ds.png', sys, t_explore_start, t_explore_end);
-    exportgraphics(fig, fullfile(raw_explore_folder, fname), 'Resolution', 150);
-    close(fig);
-    fprintf('✅ %s salvato.\n', sys);
 end
-
-disp('✅ Tutte le figure raw esplorate salvate.');
-%%
-%% ===================== RAW SIGNAL PLOT: All active electrodes New system =====================
-
-system_to_plot = 'new';
-div_panels     = [2, 1];   % DIV55 and DIV60
-t_start = 0;
-t_end   = 60;
-
-saveFolder_raw = 'S:\met_narkilahti_neuro_sto-3700\MEA_data_internship\Lorenzo\OldVSNew\Spectrograms\FIGURE2C_v2\new system raw';
-if ~exist(saveFolder_raw, 'dir'), mkdir(saveFolder_raw); end
-
-for pp = 1:length(div_panels)
-    p   = div_panels(pp);
-    tag = panels(p).tag;
-
-    rec_new        = recordings.(tag).new;
-    sf_new         = recordings.(tag).sf_new;
-    activeElec_new = activeElec.(tag).new;
-    wells          = wells_new;
-
-    % Collect all active electrodes across all wells
-    allElec = {};
-    for w = 1:length(wells)
-        wName   = wells{w};
-        wellIdx = find(strcmp(cellstr([activeElec_new.well]), wName));
-        if isempty(wellIdx), continue; end
-        activeNames = activeElec_new(wellIdx).activeElectrodes;
-        if isempty(activeNames), continue; end
-        for e = 1:length(activeNames)
-            eName = char(activeNames{e});
-            if ~isfield(rec_new, wName), continue; end
-            if ~isfield(rec_new.(wName), eName), continue; end
-            allElec{end+1} = struct('well', wName, 'elec', eName);
-        end
-    end
-
-    nElec = length(allElec);
-    fprintf('new %s: %d active electrodes found.\n', tag, nElec);
-
-    % --- Plot ---
-    nCols = 4;
-    nRows = ceil(nElec / nCols);
-
-    fig = figure('Visible','off','Position',[100 100 1800 nRows*150]);
-    tl  = tiledlayout(nRows, nCols, 'TileSpacing','compact','Padding','loose');
-
-    for i = 1:nElec
-        wName = allElec{i}.well;
-        eName = allElec{i}.elec;
-
-        raw = rec_new.(wName).(eName);
-        t   = (0:length(raw)-1) / sf_new;
-        idx = t >= t_start & t <= t_end;
-
-        nexttile;
-        plot(t(idx), raw(idx) * 1e6, 'Color', c_new, 'LineWidth', 0.5);
-        title([wName ' - ' eName]);
-        xlabel('Time (s)');
-        ylabel('µV');
-        xlim([t_start t_end]);
-        grid on;
-    end
-
-    title(tl, sprintf('RAW signals — new %s (%d active electrodes)', ...
-        panels(p).DIV_label, nElec), 'FontSize', 12);
-
-    saveName = sprintf('RAW_new_%s.png', tag);
-    exportgraphics(fig, fullfile(saveFolder_raw, saveName), 'Resolution', 300);
-    savefig(fig, fullfile(saveFolder_raw, strrep(saveName, '.png', '.fig')));
-    close(fig);
-
-    fprintf('✅ new %s saved.\n', tag);
-end
-disp('✅ All new raw plots saved.');
