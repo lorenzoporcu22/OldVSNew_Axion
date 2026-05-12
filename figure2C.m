@@ -28,10 +28,6 @@ nfft_spec     = 2048;
 t_start       = 0;
 t_end         = 60;
 smooth_window = 500;
-window_psd    = hamming(4096);
-noverlap_psd  = 2048;
-nfft_psd      = 8192;
-min_active_electrodes = 3;
 
 % --- Colors ---
 c_new_raw    = [0.85 0.15 0.15];
@@ -141,20 +137,14 @@ idx_new = t_new >= t_start & t_new <= t_end;
 idx_old = t_old >= t_start & t_old <= t_end;
 
 % --- Shared Y limits (robust) ---
-raw_all = [raw_new(idx_new); raw_old(idx_old)] * 1e6;
-raw_all = raw_all(:);
-raw_all = raw_all(isfinite(raw_all));
-raw_ylim = safeYLim(raw_all);
+raw_all    = [raw_new(idx_new); raw_old(idx_old)] * 1e6;
+raw_ylim   = safeYLim(raw_all(isfinite(raw_all)));
 
-lfp_all = [lfp_new(idx_new); lfp_old(idx_old)] * 1e6;
-lfp_all = lfp_all(:);
-lfp_all = lfp_all(isfinite(lfp_all));
-lfp_ylim = safeYLim(lfp_all);
+lfp_all    = [lfp_new(idx_new); lfp_old(idx_old)] * 1e6;
+lfp_ylim   = safeYLim(lfp_all(isfinite(lfp_all)));
 
-smo_all = [lfp_new_smooth(idx_new); lfp_old_smooth(idx_old)] * 1e6;
-smo_all = smo_all(:);
-smo_all = smo_all(isfinite(smo_all));
-smooth_ylim = safeYLim(smo_all);
+smo_all    = [lfp_new_smooth(idx_new); lfp_old_smooth(idx_old)] * 1e6;
+smooth_ylim = safeYLim(smo_all(isfinite(smo_all)));
 
 % --- Spectrograms ---
 [s_new, f_new, ts_new] = spectrogram(lfp_new, win_spec, noverlap_spec, nfft_spec, recordings.(tag).sf_new);
@@ -236,32 +226,6 @@ disp('✅ Figure 2C v3 2x4 saved.');
 
 %% ===================== HELPER FUNCTION =====================
 
-function wellPSD = computeWellPSD(rec, wells, activeElecPerWell, b, a, sf, window_psd, noverlap_psd, nfft_psd, lfp_cut, min_active)
-    wellPSD = [];
-    for w = 1:length(wells)
-        wName = wells{w};
-        if ~isfield(rec, wName), continue; end
-        wellIdx = find(strcmp(cellstr([activeElecPerWell.well]), wName));
-        if isempty(wellIdx), continue; end
-        activeNames = activeElecPerWell(wellIdx).activeElectrodes;
-        if length(activeNames) < min_active, continue; end
-        elecPSD = [];
-        for e = 1:length(activeNames)
-            eName = activeNames{e};
-            if ~isfield(rec.(wName), eName), continue; end
-            data     = filtfilt(b, a, rec.(wName).(eName));
-            [pxx, f] = pwelch(data, window_psd, noverlap_psd, nfft_psd, sf);
-            idxF     = f <= lfp_cut;
-            if isempty(elecPSD)
-                elecPSD = zeros(sum(idxF), length(activeNames));
-            end
-            elecPSD(:, e) = pxx(idxF);
-        end
-        if isempty(elecPSD), continue; end
-        wellPSD(:, end+1) = mean(elecPSD, 2);
-    end
-end
-
 function yl = safeYLim(v)
     if isempty(v)
         yl = [-1 1];
@@ -269,9 +233,9 @@ function yl = safeYLim(v)
     end
     vmin = min(v);
     vmax = max(v);
-    pad  = max((vmax - vmin) * 0.1, 1);   % minimo 1 µV
+    pad  = max((vmax - vmin) * 0.1, 1);
     yl   = [vmin - pad, vmax + pad];
-    if yl(1) >= yl(2)                      % safety fallback
+    if yl(1) >= yl(2)
         yl = [yl(1) - 1, yl(1) + 1];
     end
 end
